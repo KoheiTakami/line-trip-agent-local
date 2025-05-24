@@ -6,6 +6,7 @@ process.on('uncaughtException', (err) => {
 });
 
 const getSheetData = require('./getSheetData');
+const getGoogleMapsLink = require('../utils/getGoogleMapsLink');
 
 export default async function handler(req, res) {
   try {
@@ -112,7 +113,25 @@ ${JSON.stringify(spots.slice(0, 10))}
       }),
     });
     const openaiData = await openaiRes.json();
-    const gptReply = openaiData.choices?.[0]?.message?.content || 'エラーが発生しました';
+    let gptReply = openaiData.choices?.[0]?.message?.content || 'エラーが発生しました';
+
+    // ChatGPTの返答からスポット名を抽出し、Google Mapsリンクを正確なものに置換
+    // 例: 📍スポット名\n...\n🗺️ ...
+    const spotRegex = /📍(.+?)\n[\s\S]*?🗺️ ?(https?:\/\/[^\s]+)/g;
+    let match;
+    const replacements = [];
+    while ((match = spotRegex.exec(gptReply)) !== null) {
+      const spotName = match[1].trim();
+      try {
+        const mapsUrl = await getGoogleMapsLink(spotName);
+        replacements.push({ original: match[2], newUrl: mapsUrl });
+      } catch (e) {
+        // 取得失敗時は元のまま
+      }
+    }
+    for (const rep of replacements) {
+      gptReply = gptReply.replace(rep.original, rep.newUrl);
+    }
 
     // LINEに返信
     const lineAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
