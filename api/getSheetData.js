@@ -1,7 +1,7 @@
 const { google } = require('googleapis');
 const sheets = google.sheets('v4');
 const auth = new google.auth.GoogleAuth({
-  keyFile: 'line-trip-agent-local-8bb1eaed63dc.json',
+  credentials: JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS),
   scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
 });
 
