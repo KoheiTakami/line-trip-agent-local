@@ -1,4 +1,4 @@
-const getSheetData = require('../utils/getSheetData');
+const getSheetData = require('./getSheetData');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
