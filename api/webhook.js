@@ -1,3 +1,5 @@
+const getSheetData = require('../utils/getSheetData');
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
@@ -11,6 +13,45 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'No replyToken or userMessage', body: req.body });
   }
 
+  // Google Sheetsからスポットデータを取得
+  let spots = [];
+  try {
+    const sheetData = await getSheetData();
+    // 1行目はヘッダー想定、2列目以降は適宜調整
+    spots = sheetData.slice(1).map(row => ({
+      name: row[0],
+      category: row[1],
+      features: row[2],
+      culturalBackground: row[3],
+      accessInfo: row[4],
+      googleMapsLink: row[5],
+    }));
+  } catch (e) {
+    return res.status(500).json({ message: 'Google Sheetsデータ取得エラー', error: e.message });
+  }
+
+  // プロンプト
+  const systemPrompt = `あなたは日本のことをよく知る親切で信頼できる、かつSerendipity（偶然の素敵な出会い）を大切にする旅行ガイドです。
+
+まずはユーザーの現在の予定や興味について質問してください。
+その上で、場所や気分に基づいて、内部データベースや公開情報を使って1〜2か所のスポットをおすすめしてください。
+
+以下の項目を含めてください：
+
+名前（Name）
+カテゴリー（Category）
+特徴（Features）
+文化的背景（Cultural Background）
+アクセス情報（Access Info）
+なぜそのユーザーに合っているのか（Reason why it matches the user）
+Google Mapsのリンク（Google Maps link）
+
+LINEで読みやすいように、短く・親しみやすく・わかりやすく書いてください。
+
+スポットデータ:
+${JSON.stringify(spots.slice(0, 10))}
+`;
+
   // OpenAI APIで返答を取得
   const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -21,10 +62,7 @@ export default async function handler(req, res) {
     body: JSON.stringify({
       model: 'gpt-3.5-turbo',
       messages: [
-        {
-          role: 'system',
-          content: 'あなたは日本のことをよく知る、丁寧で親切、かつSerendipity（偶然の素敵な出会い）を大切にするツアーガイドです。旅行者の趣味や会話内容から、本人が気づかないような意外なスポットや体験、映画やアニメのロケ地、地元の人しか知らない穴場など、「思いがけない発見」や「驚き」を与える提案を積極的に行ってください。また、旅行者の興味や好きなものに関連する情報を自分から質問し、会話の中でSerendipityを生み出すことを心がけてください。'
-        },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage }
       ],
     }),
