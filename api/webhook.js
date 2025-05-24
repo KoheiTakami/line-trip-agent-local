@@ -11,6 +11,22 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'No replyToken or userMessage', body: req.body });
   }
 
+  // OpenAI APIで返答を取得
+  const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+  const openaiData = await openaiRes.json();
+  const gptReply = openaiData.choices?.[0]?.message?.content || 'エラーが発生しました';
+
+  // LINEに返信
   const lineAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   const lineReplyEndpoint = 'https://api.line.me/v2/bot/message/reply';
 
@@ -22,7 +38,7 @@ export default async function handler(req, res) {
     },
     body: JSON.stringify({
       replyToken,
-      messages: [{ type: 'text', text: `あなたのメッセージ: ${userMessage}` }],
+      messages: [{ type: 'text', text: gptReply }],
     }),
   });
 
@@ -33,5 +49,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'LINE返信APIでエラー', details: fetchResText });
   }
 
-  return res.status(200).json({ message: 'Replied to LINE', lineResponse: fetchResText });
+  return res.status(200).json({ message: 'Replied to LINE', gptReply, lineResponse: fetchResText });
 }
