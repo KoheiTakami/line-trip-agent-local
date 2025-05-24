@@ -60,6 +60,9 @@ export default async function handler(req, res) {
   - 🎞️なぜそのユーザーに合いそうか（興味との接点、連想、記憶、気分）
   - 🗺️Google Mapsリンク
 
+- 提案する場所のGoogle Mapsリンクは、必ず \`https://www.google.com/maps/place/...\` というフルリンク形式にしてください。  
+  \`goo.gl/maps/...\` などの短縮リンクは使わないでください。
+
 ---
 
 ▼ Serendipityを生むための工夫：
