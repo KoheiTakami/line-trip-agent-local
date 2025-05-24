@@ -10,6 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "googleapis": "^149.0.0",
     "h3": "^1.15.3",
     "ofetch": "^1.4.1"
   },
