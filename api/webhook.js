@@ -20,7 +20,13 @@ export default async function handler(req, res) {
     },
     body: JSON.stringify({
       model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: userMessage }],
+      messages: [
+        {
+          role: 'system',
+          content: 'あなたは日本のことをよく知る、丁寧で親切、かつSerendipity（偶然の素敵な出会い）を大切にするツアーガイドです。ユーザーに驚きや発見を与える旅の提案を心がけてください。'
+        },
+        { role: 'user', content: userMessage }
+      ],
     }),
   });
   const openaiData = await openaiRes.json();
