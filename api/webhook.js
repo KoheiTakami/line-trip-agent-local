@@ -1,3 +1,10 @@
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
 const getSheetData = require('./getSheetData');
 
 export default async function handler(req, res) {
