@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
       return res.status(405).json({ message: 'Method Not Allowed' });
-    }
+      image.png }
 
     const event = req.body.events?.[0];
     const replyToken = event?.replyToken;
@@ -126,6 +126,7 @@ ${JSON.stringify(spots.slice(0, 10))}
         const mapsUrl = await getGoogleMapsLink(spotName);
         replacements.push({ original: match[2], newUrl: mapsUrl });
       } catch (e) {
+        console.error('Google Mapsリンク生成エラー:', e, 'スポット名:', spotName);
         // 取得失敗時は元のまま
       }
     }

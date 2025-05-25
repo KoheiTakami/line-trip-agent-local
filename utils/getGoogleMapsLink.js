@@ -8,7 +8,11 @@ const fetch = require('node-fetch');
 async function getGoogleMapsLink(spotName) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) throw new Error('GOOGLE_MAPS_API_KEY is not set');
-  const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(spotName)}&inputtype=textquery&fields=place_id&key=${apiKey}`;
+  // 東京・表参道周辺をデフォルトのバイアスにする
+  const locationBias = 'point:35.665498,139.712891'; // 表参道駅付近
+  // スポット名に地名を付加（例：La jolla → La jolla 表参道 東京）
+  const query = `${spotName} 東京 表参道`;
+  const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=place_id&key=${apiKey}&locationbias=${locationBias}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.status === 'OK' && data.candidates.length > 0) {
