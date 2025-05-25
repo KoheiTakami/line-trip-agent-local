@@ -124,14 +124,28 @@ ${JSON.stringify(spots.slice(0, 10))}
       const spotName = match[1].trim();
       try {
         const mapsUrl = await getGoogleMapsLink(spotName);
-        replacements.push({ original: match[2], newUrl: mapsUrl });
+        replacements.push({ original: match[2], newUrl: mapsUrl, spotName });
       } catch (e) {
         console.error('Google Mapsリンク生成エラー:', e, 'スポット名:', spotName);
         // 取得失敗時は元のまま
       }
     }
     for (const rep of replacements) {
+      console.log(`Google Mapsリンク置換: スポット名: ${rep.spotName}\n  置換前: ${rep.original}\n  置換後: ${rep.newUrl}`);
       gptReply = gptReply.replace(rep.original, rep.newUrl);
+    }
+    // /maps/place/スポット名 形式のリンクも必ず置換
+    const placeNameRegex = /https?:\/\/www\.google\.com\/maps\/place\/([^\s)]+)/g;
+    let placeMatch;
+    while ((placeMatch = placeNameRegex.exec(gptReply)) !== null) {
+      const spotName = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+      try {
+        const mapsUrl = await getGoogleMapsLink(spotName);
+        console.log(`Google Mapsリンク再置換: スポット名: ${spotName}\n  置換前: ${placeMatch[0]}\n  置換後: ${mapsUrl}`);
+        gptReply = gptReply.replace(placeMatch[0], mapsUrl);
+      } catch (e) {
+        console.error('Google Mapsリンク再置換エラー:', e, 'スポット名:', spotName);
+      }
     }
 
     // LINEに返信
