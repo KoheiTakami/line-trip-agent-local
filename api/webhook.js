@@ -8,18 +8,118 @@ process.on('uncaughtException', (err) => {
 const getSheetData = require('./getSheetData');
 const getGoogleMapsLink = require('../utils/getGoogleMapsLink');
 
+// ユーザーごとの位置情報を一時保存（Vercelサーバーレスでは永続化されない点に注意）
+const userLocations = new Map();
+
 export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
       return res.status(405).json({ message: 'Method Not Allowed' });
-      image.png }
+    }
 
     const event = req.body.events?.[0];
     const replyToken = event?.replyToken;
+    const userId = event?.source?.userId;
     const userMessage = event?.message?.text;
 
-    if (!replyToken || !userMessage) {
-      return res.status(200).json({ message: 'No replyToken or userMessage', body: req.body });
+    // 位置情報メッセージ受信時の処理
+    if (event?.message?.type === 'location' && userId) {
+      const userLat = event.message.latitude;
+      const userLng = event.message.longitude;
+      userLocations.set(userId, { lat: userLat, lng: userLng, timestamp: Date.now() });
+      // ユーザーに「現在地を記録しました」と返信
+      const lineAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+      const lineReplyEndpoint = 'https://api.line.me/v2/bot/message/reply';
+      const fetchRes = await fetch(lineReplyEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${lineAccessToken}`,
+        },
+        body: JSON.stringify({
+          replyToken,
+          messages: [{ type: 'text', text: '現在地を記録しました！この後「近くのおすすめ」などを聞くと、現在地をもとに提案します。' }],
+        }),
+      });
+      const fetchResText = await fetchRes.text();
+      console.log('LINE位置情報記録APIレスポンス:', fetchRes.status, fetchResText);
+      if (!fetchRes.ok) {
+        return res.status(500).json({ error: 'LINE返信APIでエラー', details: fetchResText });
+      }
+      return res.status(200).json({ message: 'Replied to LINE (location set)' });
+    }
+
+    // 例：「近く」「周辺」「今いる場所」などのキーワードが含まれる場合は現在地を利用
+    if (userId && userMessage && userLocations.has(userId)) {
+      const lowerMsg = userMessage.toLowerCase();
+      if (lowerMsg.includes('近く') || lowerMsg.includes('周辺') || lowerMsg.includes('今いる') || lowerMsg.includes('current location')) {
+        const { lat, lng } = userLocations.get(userId);
+        // ここで「現在地から近いスポット提案」ロジックを呼び出す（前回の距離計算ロジックを流用）
+        let spots = [];
+        try {
+          const sheetData = await getSheetData();
+          spots = sheetData.slice(1).map(row => ({
+            name: row[0],
+            category: row[1],
+            features: row[2],
+            culturalBackground: row[3],
+            accessInfo: row[4],
+            location_url: row[5]
+          }));
+        } catch (e) {
+          return res.status(500).json({ message: 'Google Sheetsデータ取得エラー', error: e.message });
+        }
+        function extractLatLng(url) {
+          const match = url && url.match(/q=([\d.\-]+),([\d.\-]+)/);
+          if (match) {
+            return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+          }
+          return null;
+        }
+        function calcDistance(lat1, lng1, lat2, lng2) {
+          function toRad(x) { return x * Math.PI / 180; }
+          const R = 6371;
+          const dLat = toRad(lat2 - lat1);
+          const dLng = toRad(lng2 - lng1);
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                    Math.sin(dLng/2) * Math.sin(dLng/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          return R * c;
+        }
+        const spotsWithDistance = spots.map(spot => {
+          const latlng = extractLatLng(spot.location_url);
+          if (!latlng) return null;
+          return {
+            ...spot,
+            distance: calcDistance(lat, lng, latlng.lat, latlng.lng)
+          };
+        }).filter(Boolean);
+        const nearest = spotsWithDistance.sort((a, b) => a.distance - b.distance).slice(0, 3);
+        let reply = '現在地から近いおすすめスポットはこちらです！\n';
+        for (const spot of nearest) {
+          reply += `\n📍${spot.name}\nジャンル: ${spot.category}\n特徴: ${spot.features}\n距離: 約${spot.distance.toFixed(1)}km\n🗺️Google Maps: ${spot.location_url}\n`;
+        }
+        const lineAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+        const lineReplyEndpoint = 'https://api.line.me/v2/bot/message/reply';
+        const fetchRes = await fetch(lineReplyEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${lineAccessToken}`,
+          },
+          body: JSON.stringify({
+            replyToken,
+            messages: [{ type: 'text', text: reply }],
+          }),
+        });
+        const fetchResText = await fetchRes.text();
+        console.log('LINE現在地参照APIレスポンス:', fetchRes.status, fetchResText);
+        if (!fetchRes.ok) {
+          return res.status(500).json({ error: 'LINE返信APIでエラー', details: fetchResText });
+        }
+        return res.status(200).json({ message: 'Replied to LINE (current location spots)', reply });
+      }
     }
 
     // Google Sheetsからスポットデータを取得
