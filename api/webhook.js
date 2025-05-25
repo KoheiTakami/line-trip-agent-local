@@ -32,8 +32,8 @@ export default async function handler(req, res) {
         category: row[1],
         features: row[2],
         culturalBackground: row[3],
-        accessInfo: row[4],
-        googleMapsLink: row[5],
+        accessInfo: row[4]
+        // location_url（row[5]）は除外
       }));
     } catch (e) {
       return res.status(500).json({ message: 'Google Sheetsデータ取得エラー', error: e.message });
