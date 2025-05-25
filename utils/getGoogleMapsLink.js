@@ -10,7 +10,7 @@ async function getGoogleMapsLink(spotName) {
   if (!apiKey) throw new Error('GOOGLE_MAPS_API_KEY is not set');
   // 東京・表参道周辺をデフォルトのバイアスにする
   const locationBias = 'point:35.665498,139.712891'; // 表参道駅付近
-  // スポット名に地名を付加（例：La jolla → La jolla 表参道 東京）
+  // スポット名に地名を付加（例：La jolla → La jolla 東京 表参道）
   const query = `${spotName} 東京 表参道`;
   const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=place_id&key=${apiKey}&locationbias=${locationBias}`;
   const res = await fetch(url);
@@ -19,7 +19,8 @@ async function getGoogleMapsLink(spotName) {
     const placeId = data.candidates[0].place_id;
     return `https://www.google.com/maps/place/?q=place_id:${placeId}`;
   }
-  throw new Error('Place ID not found for: ' + spotName);
+  // Place IDが取得できなかった場合は検索リンクを返す
+  return `https://www.google.com/maps/search/?query=${encodeURIComponent(query)}`;
 }
 
 module.exports = getGoogleMapsLink; 
